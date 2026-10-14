@@ -393,6 +393,30 @@ body.is-admin .admin-only { display: block; }
         <div class="panel">
           <div class="section-head">
             <div>
+              <h3>Files</h3>
+              <p>Create, open and edit your bot's text files. Restart the bot after saving to run the changes.</p>
+            </div>
+            <button class="btn-ghost" type="button" id="refreshFiles">Refresh</button>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+            <input id="newFileName" placeholder="e.g. config.js or lib/helpers.js" maxlength="300" autocomplete="off" style="flex:1;min-width:200px">
+            <button class="btn-sm btn" type="button" id="newFileBtn" style="margin-top:0;width:auto">Create file</button>
+          </div>
+          <div id="fileList" style="display:flex;flex-direction:column;gap:4px;margin-bottom:12px"></div>
+          <div class="hidden" id="editorBox">
+            <label id="editorLabel" for="fileEditor">File</label>
+            <textarea id="fileEditor" spellcheck="false" style="min-height:320px;font-family:monospace"></textarea>
+            <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:10px">
+              <button class="btn-danger" type="button" id="deleteFileBtn">Delete file</button>
+              <button class="btn" type="button" id="saveFileBtn">Save file</button>
+            </div>
+          </div>
+          <div class="msg" id="fileMsg" role="alert"></div>
+        </div>
+
+        <div class="panel">
+          <div class="section-head">
+            <div>
               <h3>Environment variables</h3>
               <p>Set secrets such as bot tokens. Values are stored encrypted and never shown again. Restart the bot after changing them.</p>
             </div>
@@ -869,10 +893,117 @@ body.is-admin .admin-only { display: block; }
   // ---------- bot detail ----------
   function openBot(id) {
     currentBotId = id;
+    closeEditor();
     showPage('bot');
     refreshBot();
+    loadFiles();
     startBotPolling();
   }
+
+  // ---------- bot files ----------
+  let openFilePath = null;
+  let fileDirty = false;
+
+  function setFileDirty(v) {
+    fileDirty = v;
+    const label = $('editorLabel');
+    label.textContent = (openFilePath ? 'Editing: ' + openFilePath : 'File') + (v ? ' (unsaved changes)' : '');
+  }
+
+  function closeEditor() {
+    openFilePath = null;
+    setFileDirty(false);
+    $('fileEditor').value = '';
+    $('editorBox').classList.add('hidden');
+    setMsg($('fileMsg'), '');
+  }
+
+  async function loadFiles() {
+    if (!currentBotId) return;
+    const r = await api('/api/bots/' + currentBotId + '/files');
+    if (!r.ok) return setMsg($('fileMsg'), r.data.error || 'Could not load files.', 'error');
+
+    const list = $('fileList');
+    if (!r.data.files.length) {
+      list.replaceChildren(el('p', { class: 'stat-foot', text: 'No files yet. Create one above.' }));
+      return;
+    }
+    const rows = r.data.files.map(f => {
+      if (f.type === 'dir') {
+        return el('div', { class: 'stat-foot', text: '📁 ' + f.path + '/' });
+      }
+      const isActive = f.path === openFilePath;
+      return el('button', {
+        class: isActive ? 'btn-sm btn' : 'btn-ghost',
+        type: 'button',
+        style: 'text-align:left;margin-top:0;width:100%',
+        text: f.path + '  (' + Math.max(1, Math.round(f.size / 1024)) + ' KB)',
+        onclick: () => openFile(f.path)
+      });
+    });
+    list.replaceChildren(...rows);
+    if (r.data.truncated) {
+      list.appendChild(el('p', { class: 'stat-foot', text: 'Only the first ' + r.data.files.length + ' items are shown.' }));
+    }
+  }
+
+  async function openFile(path) {
+    if (fileDirty && !confirm('Discard your unsaved changes?')) return;
+    const r = await api('/api/bots/' + currentBotId + '/file?path=' + encodeURIComponent(path));
+    if (!r.ok) return setMsg($('fileMsg'), r.data.error || 'Could not open that file.', 'error');
+    openFilePath = r.data.path;
+    $('fileEditor').value = r.data.content;
+    $('editorBox').classList.remove('hidden');
+    setFileDirty(false);
+    setMsg($('fileMsg'), '');
+    loadFiles();
+  }
+
+  async function saveFile() {
+    if (!openFilePath) return;
+    const r = await api('/api/bots/' + currentBotId + '/file', { method: 'PUT', body: {
+      path: openFilePath,
+      content: $('fileEditor').value
+    } });
+    if (r.ok) {
+      setFileDirty(false);
+      setMsg($('fileMsg'), r.data.message || 'Saved.', 'ok');
+      loadFiles();
+    } else {
+      setMsg($('fileMsg'), r.data.error || 'Could not save the file.', 'error');
+    }
+  }
+
+  async function createFile() {
+    const name = $('newFileName').value.trim();
+    if (!name) return setMsg($('fileMsg'), 'Type a file name first, like index.js.', 'error');
+    if (fileDirty && !confirm('Discard your unsaved changes?')) return;
+    const r = await api('/api/bots/' + currentBotId + '/file', { method: 'PUT', body: { path: name, content: '' } });
+    if (!r.ok) return setMsg($('fileMsg'), r.data.error || 'Could not create the file.', 'error');
+    $('newFileName').value = '';
+    setFileDirty(false);
+    await openFile(r.data.path);
+    setMsg($('fileMsg'), 'File created. Write your code, then press Save file.', 'ok');
+  }
+
+  async function deleteOpenFile() {
+    if (!openFilePath) return;
+    if (!confirm('Delete ' + openFilePath + '? This cannot be undone.')) return;
+    const r = await api('/api/bots/' + currentBotId + '/file?path=' + encodeURIComponent(openFilePath), { method: 'DELETE' });
+    if (!r.ok) return setMsg($('fileMsg'), r.data.error || 'Could not delete the file.', 'error');
+    closeEditor();
+    setMsg($('fileMsg'), 'File deleted.', 'ok');
+    loadFiles();
+  }
+
+  $('refreshFiles').addEventListener('click', loadFiles);
+  $('newFileBtn').addEventListener('click', createFile);
+  $('saveFileBtn').addEventListener('click', saveFile);
+  $('deleteFileBtn').addEventListener('click', deleteOpenFile);
+  $('fileEditor').addEventListener('input', () => { if (openFilePath && !fileDirty) setFileDirty(true); });
+  $('fileEditor').addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); saveFile(); }
+  });
 
   function startBotPolling() {
     stopBotPolling();

@@ -35,7 +35,7 @@ fs.mkdirSync(botsRoot, { recursive: true });
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.json({ limit: '32kb' }));
+app.use(express.json({ limit: '600kb' }));
 
 // ---------- database ----------
 const db = new Database(path.join(dataDir, 'panel.db'));
@@ -886,6 +886,153 @@ app.delete('/api/bots/:id', requireLogin, async (req, res) => {
   removeBotFiles(bot.id);
   deleteBot.run(bot.id);
   res.json({ success: true, message: 'Bot deleted.' });
+});
+
+// ---------- bot files (owner only, text files only) ----------
+const FILE_MAX_BYTES = 512 * 1024;
+const FILES_MAX_ENTRIES = 500;
+
+// Checks a relative path from the user and returns the absolute path inside the
+// bot's code folder. Returns null for anything unsafe (absolute paths, "..",
+// backslashes, symbolic links, node_modules).
+function safeCodePath(codeRoot, rel) {
+  if (typeof rel !== 'string' || rel.length === 0 || rel.length > 300) return null;
+  if (rel.includes('\0') || rel.includes('\\') || path.isAbsolute(rel) || /^[a-zA-Z]:/.test(rel)) return null;
+  const parts = rel.split('/').filter(p => p !== '' && p !== '.');
+  if (parts.length === 0 || parts.length > 20) return null;
+  if (parts.some(p => p === '..' || p.length > 120)) return null;
+  if (parts[0] === 'node_modules') return null;
+
+  const abs = path.resolve(codeRoot, ...parts);
+  if (!abs.startsWith(codeRoot + path.sep)) return null;
+
+  let cur = codeRoot;
+  for (const p of parts) {
+    cur = path.join(cur, p);
+    let st;
+    try { st = fs.lstatSync(cur); } catch (_) { break; }
+    if (st.isSymbolicLink()) return null;
+  }
+  return { abs, rel: parts.join('/') };
+}
+
+function listCodeFiles(codeRoot) {
+  const out = [];
+  let truncated = false;
+  (function walk(dir, relDir) {
+    const entries = fs.readdirSync(dir, { withFileTypes: true })
+      .sort((a, b) => a.name.localeCompare(b.name));
+    for (const ent of entries) {
+      if (out.length >= FILES_MAX_ENTRIES) { truncated = true; return; }
+      if (ent.isSymbolicLink()) continue;
+      const rel = relDir ? relDir + '/' + ent.name : ent.name;
+      if (ent.isDirectory()) {
+        out.push({ path: rel, type: 'dir' });
+        if (ent.name !== 'node_modules') walk(path.join(dir, ent.name), rel);
+      } else if (ent.isFile()) {
+        out.push({ path: rel, type: 'file', size: fs.statSync(path.join(dir, ent.name)).size });
+      }
+    }
+  })(codeRoot, '');
+  return { files: out, truncated };
+}
+
+app.get('/api/bots/:id/files', requireLogin, (req, res) => {
+  const bot = getUserBot.get(Number(req.params.id), req.user.id);
+  if (!bot) return res.status(404).json({ success: false, error: 'Bot not found.' });
+  const code = path.join(botDir(bot.id), 'code');
+  if (!fs.existsSync(code)) return res.json({ success: true, files: [], truncated: false });
+  const listed = listCodeFiles(code);
+  res.json({ success: true, files: listed.files, truncated: listed.truncated });
+});
+
+app.get('/api/bots/:id/file', requireLogin, (req, res) => {
+  const bot = getUserBot.get(Number(req.params.id), req.user.id);
+  if (!bot) return res.status(404).json({ success: false, error: 'Bot not found.' });
+  const code = path.join(botDir(bot.id), 'code');
+  const f = safeCodePath(code, req.query.path);
+  if (!f) return res.status(400).json({ success: false, error: 'That file path is not valid.' });
+
+  let st;
+  try { st = fs.statSync(f.abs); } catch (_) {
+    return res.status(404).json({ success: false, error: 'File not found.' });
+  }
+  if (!st.isFile()) return res.status(400).json({ success: false, error: 'That is a folder, not a file.' });
+  if (st.size > FILE_MAX_BYTES) {
+    return res.status(413).json({ success: false, error: 'This file is too large to edit here (limit 512 KB).' });
+  }
+  const buf = fs.readFileSync(f.abs);
+  if (buf.includes(0)) {
+    return res.status(415).json({ success: false, error: 'This is not a text file, so it cannot be edited here.' });
+  }
+  res.json({ success: true, path: f.rel, content: buf.toString('utf8') });
+});
+
+// Creates or overwrites a text file.
+app.put('/api/bots/:id/file', requireLogin, (req, res) => {
+  const bot = getUserBot.get(Number(req.params.id), req.user.id);
+  if (!bot) return res.status(404).json({ success: false, error: 'Bot not found.' });
+  if (bot.status === 'installing') {
+    return res.status(409).json({ success: false, error: 'Still installing. Try again in a moment.' });
+  }
+  const body = req.body || {};
+  if (typeof body.content !== 'string') {
+    return res.status(400).json({ success: false, error: 'Missing file content.' });
+  }
+  if (Buffer.byteLength(body.content, 'utf8') > FILE_MAX_BYTES) {
+    return res.status(413).json({ success: false, error: 'This file is larger than 512 KB.' });
+  }
+  if (body.content.includes('\0')) {
+    return res.status(400).json({ success: false, error: 'Only text can be saved here.' });
+  }
+
+  const code = path.join(botDir(bot.id), 'code');
+  fs.mkdirSync(code, { recursive: true });
+  const f = safeCodePath(code, body.path);
+  if (!f) return res.status(400).json({ success: false, error: 'That file path is not valid.' });
+
+  const existed = fs.existsSync(f.abs);
+  if (!existed && listCodeFiles(code).files.length >= FILES_MAX_ENTRIES) {
+    return res.status(409).json({ success: false, error: 'This bot already has the maximum number of files.' });
+  }
+  try {
+    fs.mkdirSync(path.dirname(f.abs), { recursive: true });
+    if (existed && fs.statSync(f.abs).isDirectory()) {
+      return res.status(400).json({ success: false, error: 'A folder already has that name.' });
+    }
+    fs.writeFileSync(f.abs, body.content, { encoding: 'utf8', mode: 0o644 });
+  } catch (err) {
+    console.error('Save file error:', err.message);
+    return res.status(500).json({ success: false, error: 'Could not save the file.' });
+  }
+  res.json({
+    success: true,
+    path: f.rel,
+    message: existed ? 'Saved. Restart the bot to run the changes.' : 'File created.'
+  });
+});
+
+app.delete('/api/bots/:id/file', requireLogin, (req, res) => {
+  const bot = getUserBot.get(Number(req.params.id), req.user.id);
+  if (!bot) return res.status(404).json({ success: false, error: 'Bot not found.' });
+  const code = path.join(botDir(bot.id), 'code');
+  const f = safeCodePath(code, req.query.path);
+  if (!f) return res.status(400).json({ success: false, error: 'That file path is not valid.' });
+  if (f.rel === bot.entry) {
+    return res.status(400).json({ success: false, error: 'This is the file that starts your bot, so it cannot be deleted here.' });
+  }
+  let st;
+  try { st = fs.statSync(f.abs); } catch (_) {
+    return res.status(404).json({ success: false, error: 'File not found.' });
+  }
+  if (!st.isFile()) return res.status(400).json({ success: false, error: 'Only files can be deleted here.' });
+  try {
+    fs.unlinkSync(f.abs);
+  } catch (err) {
+    console.error('Delete file error:', err.message);
+    return res.status(500).json({ success: false, error: 'Could not delete the file.' });
+  }
+  res.json({ success: true, message: 'File deleted.' });
 });
 
 // Environment variables: names are shown, values are never sent back.
