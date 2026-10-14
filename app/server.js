@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { spawn } = require('child_process');
 const express = require('express');
 const session = require('express-session');
 const bcrypt = require('bcrypt');
@@ -84,6 +85,9 @@ ensureColumn('bots', 'size_bytes', 'INTEGER NOT NULL DEFAULT 0');
 ensureColumn('bots', 'last_exit', 'TEXT');
 ensureColumn('bots', 'last_started_at', 'TEXT');
 ensureColumn('bots', 'updated_at', 'TEXT');
+ensureColumn('bots', 'source_ref', 'TEXT');
+ensureColumn('users', 'github_login', 'TEXT');
+ensureColumn('users', 'github_token_blob', 'TEXT');
 
 const runner = createRunner({
   db,
@@ -135,8 +139,8 @@ const listUserBots = db.prepare('SELECT * FROM bots WHERE user_id = ? ORDER BY i
 const getUserBot = db.prepare('SELECT * FROM bots WHERE id = ? AND user_id = ?');
 const getBotById = db.prepare('SELECT * FROM bots WHERE id = ?');
 const insertBot = db.prepare(`
-  INSERT INTO bots (user_id, name, source_type, status, updated_at)
-  VALUES (?, ?, 'zip', 'installing', datetime('now'))
+  INSERT INTO bots (user_id, name, source_type, source_ref, status, updated_at)
+  VALUES (?, ?, ?, ?, 'installing', datetime('now'))
 `);
 const deleteBot = db.prepare('DELETE FROM bots WHERE id = ?');
 const setBotEnv = db.prepare(
@@ -166,6 +170,8 @@ function publicBot(bot) {
     status: bot.status,
     entry: bot.entry,
     sizeBytes: bot.size_bytes || 0,
+    sourceType: bot.source_type,
+    sourceRef: bot.source_ref || null,
     lastExit: bot.last_exit,
     lastStartedAt: bot.last_started_at,
     createdAt: bot.created_at,
@@ -405,6 +411,140 @@ app.get('/api/bots', requireLogin, (req, res) => {
   res.json({ success: true, bots, limit: MAX_BOTS_PER_USER });
 });
 
+// ---------- creating bots (shared by ZIP upload and GitHub import) ----------
+class UserError extends Error {
+  constructor(message, status) {
+    super(message);
+    this.status = status || 400;
+  }
+}
+
+const NO_ENTRY_MESSAGE = 'No runnable Node.js file found. Include a package.json with "main" or ' +
+  '"scripts.start" (for example "node index.js"), or an index.js file.';
+
+// Works out the file to run from the "Command run" field. Only "npm start" and
+// "node yourfile.js" are accepted. Arbitrary shell commands are refused because
+// they would get around the bot sandbox.
+function resolveEntry(code, startCommand) {
+  const cmd = String(startCommand || '').trim();
+  if (!cmd || /^npm\s+start$/i.test(cmd)) {
+    const found = detectEntry(code);
+    return found ? { entry: found } : { error: NO_ENTRY_MESSAGE };
+  }
+  const m = /^node\s+([\w./-]{1,200}\.(?:js|mjs|cjs))$/.exec(cmd);
+  if (!m) {
+    return { error: 'Command run must be "npm start" or "node yourfile.js".' };
+  }
+  const abs = path.resolve(code, m[1]);
+  if (!abs.startsWith(code + path.sep) || !fs.existsSync(abs) || !fs.statSync(abs).isFile()) {
+    return { error: 'That file was not found in the repo: ' + m[1] };
+  }
+  return { entry: path.relative(code, abs) };
+}
+
+function hasSymlinks(dir) {
+  for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (ent.isSymbolicLink()) return true;
+    if (ent.isDirectory() && hasSymlinks(path.join(dir, ent.name))) return true;
+  }
+  return false;
+}
+
+// Clones a public or private GitHub repo with git. The token is passed through
+// environment variables (not the command line) and is never written to disk or logs.
+function gitClone({ url, branch, username, token, dest, home }) {
+  return new Promise((resolve, reject) => {
+    const env = {
+      PATH: process.env.PATH,
+      HOME: home,
+      GIT_TERMINAL_PROMPT: '0',
+      GIT_CONFIG_NOSYSTEM: '1'
+    };
+    if (token) {
+      const basic = Buffer.from((username || 'x-access-token') + ':' + token).toString('base64');
+      env.GIT_CONFIG_COUNT = '2';
+      env.GIT_CONFIG_KEY_0 = 'credential.helper';
+      env.GIT_CONFIG_VALUE_0 = '';
+      env.GIT_CONFIG_KEY_1 = 'http.extraHeader';
+      env.GIT_CONFIG_VALUE_1 = 'Authorization: Basic ' + basic;
+    }
+
+    const args = ['clone', '--depth', '1', '--single-branch', '--no-tags', '--quiet'];
+    if (branch) args.push('--branch', branch);
+    args.push(url, dest);
+
+    fs.mkdirSync(home, { recursive: true });
+    let child;
+    try {
+      child = spawn('git', args, { cwd: home, env, stdio: ['ignore', 'ignore', 'pipe'] });
+    } catch (err) {
+      return reject(new UserError('Git is not available on this server.', 503));
+    }
+
+    let errText = '';
+    child.stderr.on('data', (d) => { if (errText.length < 2000) errText += d.toString(); });
+    const timer = setTimeout(() => child.kill('SIGKILL'), 90000);
+    child.on('error', () => {
+      clearTimeout(timer);
+      reject(new UserError('Git is not available on this server.', 503));
+    });
+    child.on('exit', (exitCode) => {
+      clearTimeout(timer);
+      if (exitCode === 0) return resolve();
+      console.error('git clone failed:', errText.slice(0, 300));
+      reject(new UserError(
+        'Could not download the repo. Check the address and branch, and add a token if the repo is private.',
+        502
+      ));
+    });
+  });
+}
+
+// Creates a bot record, fills its code folder, works out the entry file and
+// starts the install. fill(code) puts the code in place (ZIP or git clone).
+async function createBot({ userId, name, source, sourceRef, startCommand, fill }) {
+  if (!/^[\w .-]{1,40}$/.test(name)) {
+    return { status: 400, body: { success: false, error: 'Give your bot a name (1–40 letters, numbers, spaces, dashes or underscores).' } };
+  }
+  if (!runner.sandboxAvailable) {
+    return { status: 503, body: { success: false, error: 'This server cannot run bots safely yet, so new bots are paused.' } };
+  }
+  if (countUserBots.get(userId).n >= MAX_BOTS_PER_USER) {
+    return { status: 409, body: { success: false, error: 'You can have at most ' + MAX_BOTS_PER_USER + ' bots. Delete one first.' } };
+  }
+
+  const id = Number(insertBot.run(userId, name, source, sourceRef || null).lastInsertRowid);
+  const code = path.join(botDir(id), 'code');
+  const cleanup = () => {
+    removeBotFiles(id);
+    deleteBot.run(id);
+  };
+
+  try {
+    await fill(code);
+  } catch (err) {
+    cleanup();
+    if (err instanceof UserError) return { status: err.status, body: { success: false, error: err.message } };
+    if (err instanceof ZipError) return { status: 400, body: { success: false, error: err.message } };
+    console.error('Bot import error:', err.message);
+    return { status: 500, body: { success: false, error: 'Could not import that code.' } };
+  }
+
+  const resolved = resolveEntry(code, startCommand);
+  if (resolved.error) {
+    cleanup();
+    return { status: 400, body: { success: false, error: resolved.error } };
+  }
+
+  setBotEntry.run(resolved.entry, id);
+  runner.install(id);
+  return {
+    status: 202,
+    body: { success: true, message: 'Installing dependencies…', bot: publicBot(getBotById.get(id)) }
+  };
+}
+
+// ---------- ZIP upload ----------
 app.post(
   '/api/bots',
   requireLogin,
@@ -412,68 +552,284 @@ app.post(
     type: ['application/zip', 'application/x-zip-compressed', 'application/octet-stream'],
     limit: MAX_UPLOAD_BYTES
   }),
-  (req, res) => {
+  async (req, res) => {
     const name = typeof req.query.name === 'string' ? req.query.name.trim() : '';
-    if (!/^[\w .-]{1,40}$/.test(name)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Give your bot a name (1–40 letters, numbers, spaces, dashes or underscores).'
-      });
-    }
     if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
       return res.status(400).json({ success: false, error: 'Upload a ZIP file.' });
     }
-    if (!runner.sandboxAvailable) {
-      return res.status(503).json({
-        success: false,
-        error: 'This server cannot run bots safely yet, so uploads are paused.'
-      });
-    }
-    if (countUserBots.get(req.user.id).n >= MAX_BOTS_PER_USER) {
-      return res.status(409).json({
-        success: false,
-        error: 'You can have at most ' + MAX_BOTS_PER_USER + ' bots. Delete one first.'
-      });
-    }
-
-    const id = Number(insertBot.run(req.user.id, name).lastInsertRowid);
-    const code = path.join(botDir(id), 'code');
-    const cleanup = () => {
-      removeBotFiles(id);
-      deleteBot.run(id);
-    };
-
-    try {
-      extractZip(req.body, code);
-      unwrapSingleFolder(code);
-    } catch (err) {
-      cleanup();
-      if (err instanceof ZipError) {
-        return res.status(400).json({ success: false, error: err.message });
+    const zip = req.body;
+    const out = await createBot({
+      userId: req.user.id,
+      name,
+      source: 'zip',
+      fill: (code) => {
+        extractZip(zip, code);
+        unwrapSingleFolder(code);
       }
-      console.error('Upload error:', err.message);
-      return res.status(500).json({ success: false, error: 'Could not read that ZIP file.' });
-    }
-
-    const entry = detectEntry(code);
-    if (!entry) {
-      cleanup();
-      return res.status(400).json({
-        success: false,
-        error: 'No runnable Node.js file found. Include a package.json with "main" or ' +
-          '"scripts.start" (for example "node index.js"), or an index.js file.'
-      });
-    }
-
-    setBotEntry.run(entry, id);
-    runner.install(id);
-    res.status(202).json({
-      success: true,
-      message: 'Upload received. Installing dependencies…',
-      bot: publicBot(getBotById.get(id))
     });
+    res.status(out.status).json(out.body);
   }
 );
+
+// ---------- GitHub ----------
+const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID || '';
+const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET || '';
+const PUBLIC_URL = (process.env.PUBLIC_URL || '').replace(/\/+$/, '');
+
+const getGithub = db.prepare('SELECT github_login, github_token_blob FROM users WHERE id = ?');
+const setGithub = db.prepare('UPDATE users SET github_login = ?, github_token_blob = ? WHERE id = ?');
+
+function githubConfigured() {
+  return !!(GITHUB_CLIENT_ID && GITHUB_CLIENT_SECRET && PUBLIC_URL);
+}
+
+function githubToken(userId) {
+  const row = getGithub.get(userId);
+  if (!row || !row.github_token_blob) return null;
+  const token = decryptVars(row.github_token_blob).token;
+  return typeof token === 'string' && token ? token : null;
+}
+
+function githubFetch(url, token, accept) {
+  return fetch(url, {
+    headers: {
+      Authorization: 'Bearer ' + token,
+      Accept: accept || 'application/vnd.github+json',
+      'User-Agent': 'legendary-free-panel',
+      'X-GitHub-Api-Version': '2022-11-28'
+    },
+    redirect: 'follow'
+  });
+}
+
+app.get('/api/github/status', requireLogin, (req, res) => {
+  const row = getGithub.get(req.user.id);
+  res.json({
+    success: true,
+    configured: githubConfigured(),
+    connected: !!(row && row.github_token_blob),
+    login: row ? row.github_login : null
+  });
+});
+
+// Starts the GitHub sign-in. The browser is sent to GitHub and comes back to /callback.
+app.get('/api/github/connect', requireLogin, (req, res) => {
+  if (!githubConfigured()) {
+    return res.status(503).send('GitHub sign-in is not set up on this server yet.');
+  }
+  const state = crypto.randomBytes(24).toString('hex');
+  req.session.githubState = state;
+  req.session.save((err) => {
+    if (err) return res.status(500).send('Could not start GitHub sign-in.');
+    const params = new URLSearchParams({
+      client_id: GITHUB_CLIENT_ID,
+      redirect_uri: PUBLIC_URL + '/api/github/callback',
+      scope: 'repo read:user',
+      state,
+      allow_signup: 'false'
+    });
+    res.redirect('https://github.com/login/oauth/authorize?' + params.toString());
+  });
+});
+
+app.get('/api/github/callback', requireLogin, async (req, res) => {
+  const back = (result) => res.redirect('/?github=' + result);
+  try {
+    const { code, state } = req.query;
+    const expected = req.session.githubState;
+    delete req.session.githubState;
+
+    if (!expected || typeof state !== 'string' || !safeEqual(state, expected) ||
+        typeof code !== 'string' || code.length > 200) {
+      return back('denied');
+    }
+    if (!githubConfigured()) return back('notset');
+
+    const tokenRes = await fetch('https://github.com/login/oauth/access_token', {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id: GITHUB_CLIENT_ID,
+        client_secret: GITHUB_CLIENT_SECRET,
+        code,
+        redirect_uri: PUBLIC_URL + '/api/github/callback'
+      })
+    });
+    const tokenData = await tokenRes.json().catch(() => ({}));
+    if (!tokenData.access_token) return back('failed');
+
+    const userRes = await githubFetch('https://api.github.com/user', tokenData.access_token);
+    if (!userRes.ok) return back('failed');
+    const gh = await userRes.json();
+
+    setGithub.run(
+      String(gh.login).slice(0, 39),
+      encryptVars({ token: tokenData.access_token }),
+      req.user.id
+    );
+    back('connected');
+  } catch (err) {
+    console.error('GitHub callback error:', err.message);
+    back('failed');
+  }
+});
+
+app.post('/api/github/disconnect', requireLogin, (req, res) => {
+  setGithub.run(null, null, req.user.id);
+  res.json({ success: true, message: 'GitHub disconnected.' });
+});
+
+app.get('/api/github/repos', requireLogin, async (req, res) => {
+  const token = githubToken(req.user.id);
+  if (!token) {
+    return res.status(409).json({ success: false, error: 'Connect your GitHub account first.' });
+  }
+  try {
+    const r = await githubFetch(
+      'https://api.github.com/user/repos?sort=pushed&per_page=100&affiliation=owner,collaborator,organization_member',
+      token
+    );
+    if (r.status === 401) {
+      return res.status(401).json({ success: false, error: 'GitHub access has expired. Connect again.' });
+    }
+    if (!r.ok) {
+      return res.status(502).json({ success: false, error: 'GitHub did not return your repositories.' });
+    }
+    const list = await r.json();
+    res.json({
+      success: true,
+      repos: list.map(x => ({
+        fullName: x.full_name,
+        private: !!x.private,
+        defaultBranch: x.default_branch,
+        description: x.description || ''
+      }))
+    });
+  } catch (err) {
+    console.error('GitHub repos error:', err.message);
+    res.status(502).json({ success: false, error: 'Could not reach GitHub.' });
+  }
+});
+
+app.post('/api/bots/from-github', requireLogin, async (req, res) => {
+  const repo = req.body && typeof req.body.repo === 'string' ? req.body.repo.trim() : '';
+  const branch = req.body && typeof req.body.branch === 'string' ? req.body.branch.trim() : '';
+
+  if (!/^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/.test(repo)) {
+    return res.status(400).json({ success: false, error: 'Choose a repository.' });
+  }
+  if (branch && (!/^[\w./-]{1,200}$/.test(branch) || branch.includes('..'))) {
+    return res.status(400).json({ success: false, error: 'That branch name is not valid.' });
+  }
+
+  const token = githubToken(req.user.id);
+  if (!token) {
+    return res.status(409).json({ success: false, error: 'Connect your GitHub account first.' });
+  }
+  if (!runner.sandboxAvailable) {
+    return res.status(503).json({ success: false, error: 'This server cannot run bots safely yet, so new bots are paused.' });
+  }
+  if (countUserBots.get(req.user.id).n >= MAX_BOTS_PER_USER) {
+    return res.status(409).json({
+      success: false,
+      error: 'You can have at most ' + MAX_BOTS_PER_USER + ' bots. Delete one first.'
+    });
+  }
+
+  let zip;
+  try {
+    const ref = branch ? '/' + encodeURIComponent(branch) : '';
+    const r = await githubFetch('https://api.github.com/repos/' + repo + '/zipball' + ref, token, 'application/vnd.github+json');
+    if (r.status === 401) {
+      return res.status(401).json({ success: false, error: 'GitHub access has expired. Connect again.' });
+    }
+    if (r.status === 404) {
+      return res.status(404).json({ success: false, error: 'That repository or branch was not found, or your GitHub account cannot access it.' });
+    }
+    if (!r.ok) {
+      return res.status(502).json({ success: false, error: 'GitHub did not return the code. Try again.' });
+    }
+    const declared = Number(r.headers.get('content-length') || 0);
+    if (declared > MAX_UPLOAD_BYTES) {
+      return res.status(413).json({ success: false, error: 'This repository is larger than 25 MB.' });
+    }
+    zip = Buffer.from(await r.arrayBuffer());
+    if (zip.length > MAX_UPLOAD_BYTES) {
+      return res.status(413).json({ success: false, error: 'This repository is larger than 25 MB.' });
+    }
+  } catch (err) {
+    console.error('GitHub download error:', err.message);
+    return res.status(502).json({ success: false, error: 'Could not download the code from GitHub.' });
+  }
+
+  const name = repo.split('/')[1].slice(0, 40);
+  const out = await createBot({
+    userId: req.user.id,
+    name,
+    source: 'github',
+    sourceRef: repo + (branch ? '@' + branch : ''),
+    fill: (code) => {
+      extractZip(zip, code);
+      unwrapSingleFolder(code);
+    }
+  });
+  res.status(out.status).json(out.body);
+});
+
+// Deploy from a GitHub address you paste (public or private repo).
+app.post('/api/bots/from-git', requireLogin, async (req, res) => {
+  const body = req.body || {};
+  const text = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+  const address = text(body.url, 200);
+  const branch = text(body.branch, 200);
+  const username = text(body.username, 100);
+  const token = text(body.token, 255);
+  const startCommand = text(body.startCommand, 200);
+
+  const m = /^https:\/\/github\.com\/([A-Za-z0-9_.-]{1,100})\/([A-Za-z0-9_.-]{1,100})(?:\.git)?\/?$/.exec(address);
+  if (!m) {
+    return res.status(400).json({
+      success: false,
+      error: 'Paste a GitHub repo address, like https://github.com/owner/repo'
+    });
+  }
+  if (branch && (!/^[\w./-]{1,200}$/.test(branch) || branch.includes('..'))) {
+    return res.status(400).json({ success: false, error: 'That branch name is not valid.' });
+  }
+  if (username && !/^[A-Za-z0-9_.-]{1,100}$/.test(username)) {
+    return res.status(400).json({ success: false, error: 'That git username is not valid.' });
+  }
+  if (/\s/.test(token)) {
+    return res.status(400).json({ success: false, error: 'That git token is not valid.' });
+  }
+
+  const repoName = m[2].replace(/\.git$/i, '');
+  const name = text(body.name, 40) || repoName.slice(0, 40);
+  const cloneUrl = 'https://github.com/' + m[1] + '/' + repoName + '.git';
+
+  const out = await createBot({
+    userId: req.user.id,
+    name,
+    source: 'git',
+    sourceRef: m[1] + '/' + repoName + (branch ? '@' + branch : ''),
+    startCommand,
+    fill: async (code) => {
+      await gitClone({
+        url: cloneUrl,
+        branch,
+        username,
+        token,
+        dest: code,
+        home: path.dirname(code)
+      });
+      fs.rmSync(path.join(code, '.git'), { recursive: true, force: true });
+      if (hasSymlinks(code)) {
+        throw new UserError('The repo contains symbolic links, which are not allowed.');
+      }
+    }
+  });
+  res.status(out.status).json(out.body);
+});
 
 app.get('/api/bots/:id', requireLogin, (req, res) => {
   const bot = getUserBot.get(Number(req.params.id), req.user.id);

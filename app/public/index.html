@@ -287,7 +287,68 @@ body.is-admin .admin-only { display: block; }
             <p>Upload a ZIP of your Node.js bot. It must include a package.json with a "main" or "start" script, or an index.js file.</p>
           </div>
         </div>
+        <div class="panel" style="max-width:720px" id="ghPanel">
+          <div class="section-head">
+            <div>
+              <h3>Deploy from GitHub</h3>
+              <p>Connect your GitHub account, then choose a repository to deploy.</p>
+            </div>
+          </div>
+          <div class="note hidden" id="ghNotSetUp">GitHub sign-in is not set up on this server yet. The panel owner needs to add the GitHub settings first.</div>
+          <div class="hidden" id="ghConnectBox">
+            <button class="btn" type="button" id="ghConnectBtn">Connect GitHub</button>
+          </div>
+          <div class="hidden" id="ghReadyBox">
+            <div class="info-row" style="padding-top:0"><span>Signed in as</span><span id="ghLogin">—</span></div>
+            <div style="display:flex;justify-content:flex-end;margin:4px 0 10px">
+              <button class="btn-ghost" type="button" id="ghDisconnectBtn">Disconnect GitHub</button>
+            </div>
+            <form id="ghForm" novalidate>
+              <label for="ghRepo">Repository</label>
+              <select id="ghRepo"><option value="">Loading repositories…</option></select>
+              <label for="ghBranch">Branch (leave empty for the default branch)</label>
+              <input id="ghBranch" placeholder="main" maxlength="200">
+              <label for="ghName">Bot name</label>
+              <input id="ghName" maxlength="40">
+              <button class="btn" type="submit" id="ghDeployBtn">Deploy from GitHub</button>
+            </form>
+          </div>
+          <div class="msg" id="ghMsg" role="alert"></div>
+        </div>
+
         <div class="panel" style="max-width:720px">
+          <div class="section-head">
+            <div>
+              <h3>Deploy from a Git address</h3>
+              <p>Paste a GitHub repo address. Public repos need nothing else. For a private repo, add a username and access token.</p>
+            </div>
+          </div>
+          <form id="gitForm" novalidate>
+            <label for="gitUrl">Git repo address</label>
+            <input id="gitUrl" placeholder="https://github.com/owner/repo" maxlength="200" autocomplete="off">
+            <label for="gitBranch">Install branch (leave empty for the default branch)</label>
+            <input id="gitBranch" placeholder="main" maxlength="200" autocomplete="off">
+            <label for="gitUser">Git username (private repos only, optional)</label>
+            <input id="gitUser" maxlength="100" autocomplete="off">
+            <label for="gitToken">Git access token (private repos only, optional)</label>
+            <input id="gitToken" type="password" maxlength="255" autocomplete="new-password">
+            <label for="gitCmd">Command run</label>
+            <input id="gitCmd" placeholder="npm start" value="npm start" maxlength="200" autocomplete="off">
+            <div class="note">Use "npm start" or "node yourfile.js". Other shell commands are not allowed. The token is used once to download the code and is not saved.</div>
+            <label for="gitName">Bot name</label>
+            <input id="gitName" maxlength="40" placeholder="Leave empty to use the repo name">
+            <button class="btn" type="submit" id="gitDeployBtn">Deploy from Git</button>
+          </form>
+          <div class="msg" id="gitMsg" role="alert"></div>
+        </div>
+
+        <div class="panel" style="max-width:720px">
+          <div class="section-head">
+            <div>
+              <h3>Upload a ZIP</h3>
+              <p>Or upload your bot as a ZIP file.</p>
+            </div>
+          </div>
           <form id="deployForm" novalidate>
             <label for="botName">Bot name</label>
             <input id="botName" maxlength="40" placeholder="e.g. My WhatsApp Bot" required>
@@ -504,6 +565,7 @@ body.is-admin .admin-only { display: block; }
 
     if (page === 'overview') loadOverview();
     if (page === 'bots') loadBots();
+    if (page === 'deploy') loadGithub();
     if (page === 'admin') loadAdminOverview();
     if (page === 'admin-users') loadUsers();
     if (page === 'admin-bots') loadAllBots();
@@ -650,7 +712,8 @@ body.is-admin .admin-only { display: block; }
     if (b.lastExit && !b.running) meta.push('Last exit: ' + b.lastExit);
     card.appendChild(el('div', { class: 'bot-meta', text: meta.join('\n') }));
     card.appendChild(el('div', { class: 'bot-actions' }, [
-      el('button', { class: 'btn-ghost', text: 'Open', onclick: () => openBot(b.id) })
+      el('button', { class: 'btn-sm btn', text: 'View logs', onclick: () => openBot(b.id) }),
+      el('button', { class: 'btn-ghost', text: 'Manage', onclick: () => openBot(b.id) })
     ]));
     return card;
   }
@@ -700,6 +763,106 @@ body.is-admin .admin-only { display: block; }
       openBot(r.data.bot.id);
     } else {
       setMsg($('deployMsg'), r.data.error || 'Upload failed.', 'error');
+    }
+  });
+
+  // ---------- GitHub ----------
+  async function loadGithub() {
+    const s = await api('/api/github/status');
+    const configured = s.ok && s.data.configured;
+    const connected = configured && s.data.connected;
+    $('ghNotSetUp').classList.toggle('hidden', configured);
+    $('ghConnectBox').classList.toggle('hidden', !configured || connected);
+    $('ghReadyBox').classList.toggle('hidden', !connected);
+    if (connected) {
+      $('ghLogin').textContent = '@' + s.data.login;
+      loadGithubRepos();
+    }
+  }
+
+  async function loadGithubRepos() {
+    const sel = $('ghRepo');
+    sel.replaceChildren(el('option', { value: '', text: 'Loading repositories…' }));
+    const r = await api('/api/github/repos');
+    if (!r.ok) {
+      sel.replaceChildren(el('option', { value: '', text: r.data.error || 'Could not load repositories.' }));
+      return;
+    }
+    if (!r.data.repos.length) {
+      sel.replaceChildren(el('option', { value: '', text: 'No repositories found' }));
+      return;
+    }
+    sel.replaceChildren(
+      el('option', { value: '', text: 'Choose a repository…' }),
+      ...r.data.repos.map(x => el('option', {
+        value: x.fullName,
+        text: x.fullName + (x.private ? ' (private)' : '')
+      }))
+    );
+  }
+
+  $('ghRepo').addEventListener('change', () => {
+    const v = $('ghRepo').value;
+    if (v) $('ghName').value = v.split('/')[1].slice(0, 40);
+  });
+
+  $('ghConnectBtn').addEventListener('click', () => { window.location.href = '/api/github/connect'; });
+
+  $('ghDisconnectBtn').addEventListener('click', async () => {
+    const r = await api('/api/github/disconnect', { method: 'POST' });
+    notify(r.ok ? r.data.message : (r.data.error || 'Could not disconnect.'));
+    loadGithub();
+  });
+
+  $('ghForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const repo = $('ghRepo').value;
+    const name = $('ghName').value.trim();
+    if (!repo) return setMsg($('ghMsg'), 'Choose a repository.', 'error');
+    if (!name) return setMsg($('ghMsg'), 'Enter a name for your bot.', 'error');
+
+    const btn = $('ghDeployBtn');
+    btn.disabled = true;
+    setMsg($('ghMsg'), 'Downloading from GitHub and installing… this can take a minute.');
+    const r = await api('/api/bots/from-github', { body: {
+      repo,
+      branch: $('ghBranch').value.trim(),
+      name
+    } });
+    btn.disabled = false;
+    if (r.ok) {
+      setMsg($('ghMsg'), '');
+      notify(r.data.message || 'Deploying…');
+      openBot(r.data.bot.id);
+    } else {
+      setMsg($('ghMsg'), r.data.error || 'Could not deploy from GitHub.', 'error');
+    }
+  });
+
+  $('gitForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const url = $('gitUrl').value.trim();
+    if (!url) return setMsg($('gitMsg'), 'Paste the repo address first.', 'error');
+
+    const btn = $('gitDeployBtn');
+    btn.disabled = true;
+    setMsg($('gitMsg'), 'Downloading the repo and installing… this can take a minute.');
+    const r = await api('/api/bots/from-git', { body: {
+      url,
+      branch: $('gitBranch').value.trim(),
+      username: $('gitUser').value.trim(),
+      token: $('gitToken').value.trim(),
+      startCommand: $('gitCmd').value.trim(),
+      name: $('gitName').value.trim()
+    } });
+    btn.disabled = false;
+    $('gitToken').value = '';
+    if (r.ok) {
+      setMsg($('gitMsg'), '');
+      notify(r.data.message || 'Deploying…');
+      openBot(r.data.bot.id);
+    } else {
+      setMsg($('gitMsg'), r.data.error || 'Could not deploy from Git.', 'error');
     }
   });
 
@@ -899,6 +1062,18 @@ body.is-admin .admin-only { display: block; }
     const r = await api('/api/me');
     if (r.ok && r.data.user) {
       showApp(r.data.user);
+      const result = new URLSearchParams(location.search).get('github');
+      if (result) {
+        history.replaceState(null, '', '/');
+        const messages = {
+          connected: 'GitHub connected. Choose a repository to deploy.',
+          denied: 'GitHub sign-in was cancelled or expired. Try again.',
+          failed: 'Could not connect GitHub. Try again.',
+          notset: 'GitHub sign-in is not set up on this server yet.'
+        };
+        notify(messages[result] || 'GitHub update.');
+        if (result === 'connected') showPage('deploy');
+      }
     } else {
       showAuth();
     }
