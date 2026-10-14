@@ -1,3 +1,4 @@
+const fs = require('fs');
 const express = require('express');
 const session = require('express-session');
 const bcrypt = require('bcrypt');
@@ -14,10 +15,11 @@ if (!process.env.SESSION_SECRET ||
 
 const app = express();
 const PORT = 3000;
-const dataDir = path.join(__dirname, '..', 'data');
+const dataDir = path.join(__dirname, 'data');
+fs.mkdirSync(dataDir, { recursive: true });
 
 app.disable('x-powered-by');
-app.set('trust proxy', 'loopback');
+app.set('trust proxy', 1);
 app.use(express.json({ limit: '32kb' }));
 
 const db = new Database(path.join(dataDir, 'panel.db'));
@@ -301,6 +303,6 @@ app.post('/api/auth/logout', requireLogin, (req, res) => {
   });
 });
 
-app.listen(PORT, '127.0.0.1', () => {
-  console.log(`LEGENDARY FREE PANEL backend listening on 127.0.0.1:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`LEGENDARY FREE PANEL backend listening on port ${PORT}`);
 });
