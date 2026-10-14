@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LEGENDARY FREE PANEL</title>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --card: #171a21;
+      --text: #e8eaf0;
+      --muted: #9aa3b2;
+      --accent: #7c5cff;
+      --danger: #ff6b6b;
+      --ok: #3ecf8e;
+      --border: #2a2f3a;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f4f5f8;
+        --card: #ffffff;
+        --text: #1b1e25;
+        --muted: #5d6573;
+        --border: #dde1ea;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .card {
+      width: 100%;
+      max-width: 380px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+    }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    .sub { color: var(--muted); font-size: 14px; margin: 0 0 20px; }
+    .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+    .tabs button {
+      flex: 1;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .tabs button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 6px; }
+    input {
+      width: 100%;
+      padding: 11px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 15px;
+    }
+    .btn {
+      width: 100%;
+      margin-top: 18px;
+      padding: 12px;
+      border: 0;
+      border-radius: 8px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn:disabled { opacity: 0.6; cursor: default; }
+    .btn.secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .msg { min-height: 20px; font-size: 14px; margin-top: 12px; }
+    .msg.error { color: var(--danger); }
+    .msg.ok { color: var(--ok); }
+    .hidden { display: none; }
+    .info { font-size: 15px; line-height: 1.7; }
+    .info b { color: var(--muted); font-weight: 500; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>LEGENDARY FREE PANEL</h1>
+    <p class="sub" id="subtitle">Sign in to manage your hosting.</p>
+
+    <section id="auth-view">
+      <div class="tabs">
+        <button type="button" id="tab-login" class="active">Log in</button>
+        <button type="button" id="tab-register">Register</button>
+      </div>
+
+      <form id="login-form" novalidate>
+        <label for="identifier">Username or email</label>
+        <input id="identifier" name="identifier" autocomplete="username" required>
+        <label for="login-password">Password</label>
+        <input id="login-password" type="password" name="password" autocomplete="current-password" required>
+        <button class="btn" type="submit">Log in</button>
+      </form>
+
+      <form id="register-form" class="hidden" novalidate>
+        <label for="username">Username</label>
+        <input id="username" name="username" autocomplete="username" required>
+        <label for="email">Email</label>
+        <input id="email" type="email" name="email" autocomplete="email" required>
+        <label for="register-password">Password (12+ characters)</label>
+        <input id="register-password" type="password" name="password" autocomplete="new-password" required>
+        <button class="btn" type="submit">Create account</button>
+      </form>
+
+      <div class="msg" id="auth-msg" role="alert"></div>
+    </section>
+
+    <section id="dashboard" class="hidden">
+      <div class="info">
+        <div><b>Username:</b> <span id="me-username"></span></div>
+        <div><b>Email:</b> <span id="me-email"></span></div>
+        <div><b>Role:</b> <span id="me-role"></span></div>
+      </div>
+      <button class="btn secondary" type="button" id="logout-btn">Log out</button>
+      <div class="msg" id="dash-msg" role="alert"></div>
+    </section>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    function setMsg(el, text, type) {
+      el.textContent = text || '';
+      el.className = 'msg' + (type ? ' ' + type : '');
+    }
+
+    async function api(path, body) {
+      const res = await fetch(path, {
+        method: body ? 'POST' : 'GET',
+        credentials: 'same-origin',
+        headers: body ? { 'Content-Type': 'application/json' } : {},
+        body: body ? JSON.stringify(body) : undefined
+      });
+      let data = {};
+      try { data = await res.json(); } catch (_) {}
+      return { ok: res.ok, status: res.status, data };
+    }
+
+    function showAuth() {
+      $('auth-view').classList.remove('hidden');
+      $('dashboard').classList.add('hidden');
+      $('subtitle').textContent = 'Sign in to manage your hosting.';
+    }
+
+    function showDashboard(user) {
+      $('me-username').textContent = user.username;
+      $('me-email').textContent = user.email;
+      $('me-role').textContent = user.role;
+      $('auth-view').classList.add('hidden');
+      $('dashboard').classList.remove('hidden');
+      $('subtitle').textContent = 'Welcome back, ' + user.username + '.';
+    }
+
+    function setTab(which) {
+      const login = which === 'login';
+      $('tab-login').classList.toggle('active', login);
+      $('tab-register').classList.toggle('active', !login);
+      $('login-form').classList.toggle('hidden', !login);
+      $('register-form').classList.toggle('hidden', login);
+      setMsg($('auth-msg'), '');
+    }
+
+    $('tab-login').addEventListener('click', () => setTab('login'));
+    $('tab-register').addEventListener('click', () => setTab('register'));
+
+    $('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = e.submitter || e.target.querySelector('button');
+      btn.disabled = true;
+      setMsg($('auth-msg'), 'Logging in...');
+      const r = await api('/api/auth/login', {
+        identifier: $('identifier').value,
+        password: $('login-password').value
+      });
+      btn.disabled = false;
+      if (r.ok) {
+        $('login-password').value = '';
+        setMsg($('auth-msg'), '');
+        showDashboard(r.data.user);
+      } else {
+        setMsg($('auth-msg'), r.data.error || 'Login failed. Try again.', 'error');
+      }
+    });
+
+    $('register-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = e.submitter || e.target.querySelector('button');
+      btn.disabled = true;
+      setMsg($('auth-msg'), 'Creating account...');
+      const r = await api('/api/auth/register', {
+        username: $('username').value,
+        email: $('email').value,
+        password: $('register-password').value
+      });
+      btn.disabled = false;
+      if (r.ok) {
+        $('register-password').value = '';
+        setMsg($('auth-msg'), '');
+        showDashboard(r.data.user);
+      } else {
+        setMsg($('auth-msg'), r.data.error || 'Could not create account.', 'error');
+      }
+    });
+
+    $('logout-btn').addEventListener('click', async () => {
+      const r = await api('/api/auth/logout', {});
+      if (r.ok || r.status === 401) {
+        showAuth();
+      } else {
+        setMsg($('dash-msg'), r.data.error || 'Could not log out.', 'error');
+      }
+    });
+
+    // On page load, reuse an existing session if there is one.
+    (async () => {
+      const r = await api('/api/me');
+      if (r.ok && r.data.user) showDashboard(r.data.user);
+    })();
+  </script>
+</body>
+</html>

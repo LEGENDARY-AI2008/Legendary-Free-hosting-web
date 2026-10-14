@@ -14,12 +14,13 @@ if (!process.env.SESSION_SECRET ||
 }
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 const dataDir = path.join(__dirname, 'data');
 fs.mkdirSync(dataDir, { recursive: true });
 
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
+app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json({ limit: '32kb' }));
 
 const db = new Database(path.join(dataDir, 'panel.db'));
