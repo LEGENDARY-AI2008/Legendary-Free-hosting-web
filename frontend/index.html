@@ -1,238 +1,909 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>LEGENDARY FREE PANEL</title>
-  <style>
-    :root {
-      --bg: #0f1115;
-      --card: #171a21;
-      --text: #e8eaf0;
-      --muted: #9aa3b2;
-      --accent: #7c5cff;
-      --danger: #ff6b6b;
-      --ok: #3ecf8e;
-      --border: #2a2f3a;
-    }
-    @media (prefers-color-scheme: light) {
-      :root {
-        --bg: #f4f5f8;
-        --card: #ffffff;
-        --text: #1b1e25;
-        --muted: #5d6573;
-        --border: #dde1ea;
-      }
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      background: var(--bg);
-      color: var(--text);
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 16px;
-    }
-    .card {
-      width: 100%;
-      max-width: 380px;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 24px;
-    }
-    h1 { font-size: 20px; margin: 0 0 4px; }
-    .sub { color: var(--muted); font-size: 14px; margin: 0 0 20px; }
-    .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
-    .tabs button {
-      flex: 1;
-      padding: 10px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      background: transparent;
-      color: var(--muted);
-      cursor: pointer;
-      font-size: 14px;
-    }
-    .tabs button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-    label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 6px; }
-    input {
-      width: 100%;
-      padding: 11px 12px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      background: var(--bg);
-      color: var(--text);
-      font-size: 15px;
-    }
-    .btn {
-      width: 100%;
-      margin-top: 18px;
-      padding: 12px;
-      border: 0;
-      border-radius: 8px;
-      background: var(--accent);
-      color: #fff;
-      font-size: 15px;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    .btn:disabled { opacity: 0.6; cursor: default; }
-    .btn.secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
-    .msg { min-height: 20px; font-size: 14px; margin-top: 12px; }
-    .msg.error { color: var(--danger); }
-    .msg.ok { color: var(--ok); }
-    .hidden { display: none; }
-    .info { font-size: 15px; line-height: 1.7; }
-    .info b { color: var(--muted); font-weight: 500; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#080b14">
+<title>Legendary Free Panel | LËGĒNDÃRY LAB™ Studio</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+:root {
+  --bg: #080b14; --border: rgba(148,163,184,.13);
+  --text: #edf2ff; --muted: #8995ad; --purple: #8b5cf6; --blue: #3b82f6;
+  --green: #34d399; --red: #fb7185; --amber: #fbbf24; --card: #0f1525;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Inter, system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+button, input, select, textarea { font: inherit; }
+button { cursor: pointer; }
+button:disabled { opacity: .55; cursor: default; }
+.hidden { display: none !important; }
+
+/* ---------- auth ---------- */
+#auth-view { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.auth-card { width: 100%; max-width: 390px; background: linear-gradient(145deg,#111829,#0d1220); border: 1px solid var(--border); border-radius: 16px; padding: 26px; }
+.auth-card h1 { font-size: 20px; letter-spacing: -.4px; }
+.auth-card .sub { color: var(--muted); font-size: 13px; margin: 6px 0 20px; }
+.tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+.tabs button { flex: 1; padding: 10px; border-radius: 9px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-size: 13px; }
+.tabs button.active { background: linear-gradient(110deg,#8b5cf6,#4f6df5); border-color: transparent; color: #fff; font-weight: 600; }
+label { display: block; font-size: 12px; color: var(--muted); margin: 12px 0 7px; }
+input, select, textarea { width: 100%; padding: 12px 13px; border-radius: 9px; border: 1px solid var(--border); background: #0b1020; color: var(--text); outline: none; font-size: 14px; }
+input:focus, select:focus, textarea:focus { border-color: var(--purple); }
+textarea { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; min-height: 260px; resize: vertical; }
+.btn { width: 100%; margin-top: 18px; padding: 12px; border: 0; border-radius: 10px; color: #fff; font-size: 14px; font-weight: 700; background: linear-gradient(110deg,#8b5cf6,#4f6df5); box-shadow: 0 6px 22px #6d28d926; }
+.btn-sm { width: auto; margin-top: 0; padding: 9px 13px; font-size: 12px; border-radius: 8px; }
+.btn-ghost { border: 1px solid var(--border); background: #151c2c; color: #d6def0; border-radius: 9px; padding: 9px 13px; font-size: 12px; font-weight: 600; }
+.btn-danger { border: 1px solid #fb718540; background: #fb71850f; color: #fda4af; border-radius: 9px; padding: 9px 13px; font-size: 12px; font-weight: 600; }
+.msg { min-height: 20px; font-size: 13px; margin-top: 12px; }
+.msg.error { color: var(--red); }
+.msg.ok { color: var(--green); }
+
+/* ---------- shell ---------- */
+.app { display: flex; min-height: 100vh; }
+.sidebar { width: 250px; flex-shrink: 0; background: #0a0e19; border-right: 1px solid var(--border); padding: 25px 16px; display: flex; flex-direction: column; }
+.brand { display: flex; align-items: center; gap: 12px; padding: 0 8px 28px; }
+.brand-logo { width: 43px; height: 43px; display: grid; place-items: center; border-radius: 14px; background: linear-gradient(135deg,#8b5cf6,#2563eb); font-size: 22px; font-weight: 800; }
+.brand-name { font-size: 14px; font-weight: 800; letter-spacing: .5px; }
+.brand-sub { color: var(--muted); font-size: 10px; margin-top: 5px; }
+.nav-label { color: #68758d; font-size: 10px; font-weight: 800; letter-spacing: 1.5px; padding: 15px 12px 10px; }
+.nav-item { border: 0; width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; padding: 12px 13px; margin: 3px 0; color: #98a4ba; background: transparent; border-radius: 10px; font-size: 13px; }
+.nav-item:hover { background: #151c2d; color: #fff; }
+.nav-item.active { background: linear-gradient(100deg,#713cf51f,#3b82f612); color: #c4b5fd; border: 1px solid #8b5cf624; }
+.nav-icon { width: 20px; text-align: center; font-size: 16px; }
+.sidebar-bottom { margin-top: auto; }
+.plan-card { margin-top: 20px; padding: 16px; border: 1px solid #8b5cf62c; border-radius: 14px; background: linear-gradient(140deg,#8b5cf610,#2563eb0c); }
+.plan-card h4 { font-size: 12px; margin-bottom: 7px; }
+.plan-card p { font-size: 11px; color: var(--muted); line-height: 1.7; }
+.main { flex: 1; min-width: 0; }
+.topbar { height: 78px; border-bottom: 1px solid var(--border); padding: 0 34px; display: flex; align-items: center; justify-content: space-between; gap: 16px; background: #0b0f1aaf; }
+.topbar h2 { font-size: 18px; }
+.breadcrumb { color: var(--muted); font-size: 11px; margin-top: 5px; }
+.avatar { width: 38px; height: 38px; border-radius: 12px; background: linear-gradient(135deg,#8b5cf6,#2563eb); display: grid; place-items: center; font-weight: 800; font-size: 13px; text-transform: uppercase; }
+.mobile-menu { display: none; width: 39px; height: 39px; border: 1px solid var(--border); background: #111727; border-radius: 10px; color: #cbd5e1; font-size: 16px; }
+.content { padding: 30px 34px 40px; max-width: 1400px; }
+.welcome { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: 26px; flex-wrap: wrap; }
+.welcome h1 { font-size: clamp(22px, 3vw, 28px); letter-spacing: -.6px; }
+.welcome p { color: var(--muted); font-size: 13px; margin-top: 8px; line-height: 1.6; }
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 16px; margin-bottom: 24px; }
+.stat-card, .panel { border: 1px solid var(--border); border-radius: 15px; padding: 20px; background: linear-gradient(145deg,#111829,#0d1220); min-width: 0; }
+.panel { margin-bottom: 20px; }
+.stat-title { color: var(--muted); font-size: 11px; }
+.stat-value { font-size: 20px; font-weight: 700; margin-top: 14px; letter-spacing: -.3px; overflow-wrap: anywhere; }
+.stat-foot { color: var(--muted); font-size: 11px; margin-top: 8px; }
+.dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--green); margin-right: 6px; }
+.dot.off { background: var(--red); }
+.dot.wait { background: var(--amber); }
+.section-head { display: flex; align-items: center; justify-content: space-between; gap: 15px; margin-bottom: 16px; flex-wrap: wrap; }
+.section-head h3 { font-size: 15px; }
+.section-head p { color: var(--muted); font-size: 12px; margin-top: 5px; }
+.empty { text-align: center; padding: 42px 20px; color: var(--muted); font-size: 13px; line-height: 1.7; }
+.empty b { display: block; color: var(--text); font-size: 15px; margin-bottom: 8px; }
+.bot-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; }
+.bot-card { background: linear-gradient(150deg,#111829,#0d1220); border: 1px solid var(--border); border-radius: 15px; padding: 20px; min-width: 0; }
+.bot-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.bot-name { font-size: 15px; font-weight: 700; overflow-wrap: anywhere; }
+.bot-meta { color: var(--muted); font-size: 12px; margin-top: 8px; line-height: 1.7; white-space: pre-line; }
+.badge { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border-radius: 7px; font-size: 11px; white-space: nowrap; background: #34d39912; color: #6ee7b7; }
+.badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.badge.stopped { background: #94a3b812; color: #cbd5e1; }
+.badge.installing { background: #fbbf2412; color: #fde68a; }
+.badge.crashed, .badge.install_failed { background: #fb718512; color: #fda4af; }
+.bot-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.note { border: 1px solid #8b5cf625; background: #8b5cf610; border-radius: 10px; padding: 12px 14px; color: #c5cde0; font-size: 12px; line-height: 1.7; margin-top: 14px; }
+.info-row { padding: 15px 0; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; gap: 16px; font-size: 13px; }
+.info-row:last-child { border-bottom: 0; }
+.info-row span:first-child { color: var(--muted); }
+.info-row span:last-child { overflow-wrap: anywhere; text-align: right; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 11px 8px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+th { color: var(--muted); font-weight: 600; font-size: 11px; }
+td.actions { white-space: nowrap; }
+td.actions button { margin-right: 6px; }
+.table-wrap { overflow-x: auto; }
+.footer { border-top: 1px solid var(--border); padding-top: 20px; margin-top: 30px; display: flex; justify-content: space-between; gap: 12px; color: #68758d; font-size: 11px; flex-wrap: wrap; }
+.page-view { display: none; }
+.page-view.active { display: block; }
+.toast { position: fixed; right: 24px; bottom: 24px; max-width: calc(100vw - 40px); background: #182238; border: 1px solid #8b5cf64d; color: #edf2ff; border-radius: 12px; padding: 14px 18px; font-size: 13px; box-shadow: 0 15px 45px #0008; opacity: 0; transform: translateY(15px); pointer-events: none; transition: .25s; z-index: 20; }
+.toast.show { opacity: 1; transform: translateY(0); }
+.admin-only { display: none; }
+body.is-admin .admin-only { display: block; }
+
+@media (max-width: 1100px) { .stats { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+@media (max-width: 850px) {
+  .sidebar { position: fixed; z-index: 10; inset: 0 auto 0 0; transform: translateX(-100%); width: 260px; transition: transform .25s; }
+  .sidebar.open { transform: translateX(0); }
+  .mobile-menu { display: inline-grid; place-items: center; }
+  .topbar { padding: 0 18px; }
+  .content { padding: 24px 18px; }
+  .bot-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .topbar { height: 66px; }
+  .topbar h2 { font-size: 15px; }
+  .stats { grid-template-columns: 1fr; gap: 10px; }
+  .stat-card { padding: 16px; }
+  .welcome { align-items: flex-start; flex-direction: column; }
+  .welcome .btn-sm { width: 100%; }
+  .footer { flex-direction: column; }
+}
+</style>
 </head>
 <body>
-  <main class="card">
-    <h1>LEGENDARY FREE PANEL</h1>
-    <p class="sub" id="subtitle">Sign in to manage your hosting.</p>
 
-    <section id="auth-view">
-      <div class="tabs">
-        <button type="button" id="tab-login" class="active">Log in</button>
-        <button type="button" id="tab-register">Register</button>
+<!-- LOGIN / REGISTER -->
+<section id="auth-view" class="hidden">
+  <div class="auth-card">
+    <div class="brand" style="padding:0 0 18px">
+      <div class="brand-logo">L</div>
+      <div>
+        <div class="brand-name">LEGENDARY PANEL</div>
+        <div class="brand-sub">LËGĒNDÃRY LAB™ Studio</div>
       </div>
+    </div>
+    <h1>Welcome back</h1>
+    <p class="sub">Sign in to manage your bots.</p>
 
-      <form id="login-form" novalidate>
-        <label for="identifier">Username or email</label>
-        <input id="identifier" name="identifier" autocomplete="username" required>
-        <label for="login-password">Password</label>
-        <input id="login-password" type="password" name="password" autocomplete="current-password" required>
-        <button class="btn" type="submit">Log in</button>
-      </form>
+    <div class="tabs">
+      <button type="button" id="tab-login" class="active">Log in</button>
+      <button type="button" id="tab-register">Register</button>
+    </div>
 
-      <form id="register-form" class="hidden" novalidate>
-        <label for="username">Username</label>
-        <input id="username" name="username" autocomplete="username" required>
-        <label for="email">Email</label>
-        <input id="email" type="email" name="email" autocomplete="email" required>
-        <label for="register-password">Password (12+ characters)</label>
-        <input id="register-password" type="password" name="password" autocomplete="new-password" required>
-        <button class="btn" type="submit">Create account</button>
-      </form>
+    <form id="login-form" novalidate>
+      <label for="identifier">Username or email</label>
+      <input id="identifier" autocomplete="username" required>
+      <label for="login-password">Password</label>
+      <input id="login-password" type="password" autocomplete="current-password" required>
+      <button class="btn" type="submit">Log in</button>
+    </form>
 
-      <div class="msg" id="auth-msg" role="alert"></div>
-    </section>
+    <form id="register-form" class="hidden" novalidate>
+      <label for="username">Username (3–24 letters, numbers, underscores)</label>
+      <input id="username" autocomplete="username" required>
+      <label for="email">Email</label>
+      <input id="email" type="email" autocomplete="email" required>
+      <label for="register-password">Password (12+ characters)</label>
+      <input id="register-password" type="password" autocomplete="new-password" required>
+      <button class="btn" type="submit">Create account</button>
+    </form>
 
-    <section id="dashboard" class="hidden">
-      <div class="info">
-        <div><b>Username:</b> <span id="me-username"></span></div>
-        <div><b>Email:</b> <span id="me-email"></span></div>
-        <div><b>Role:</b> <span id="me-role"></span></div>
+    <div class="msg" id="auth-msg" role="alert"></div>
+  </div>
+</section>
+
+<!-- APP -->
+<div id="app-view" class="app hidden">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-logo">L</div>
+      <div>
+        <div class="brand-name">LEGENDARY PANEL</div>
+        <div class="brand-sub">LËGĒNDÃRY LAB™ Studio</div>
       </div>
-      <button class="btn secondary" type="button" id="logout-btn">Log out</button>
-      <div class="msg" id="dash-msg" role="alert"></div>
-    </section>
+    </div>
+
+    <div class="nav-label">WORKSPACE</div>
+    <button class="nav-item active" data-page="overview"><span class="nav-icon">▦</span> Overview</button>
+    <button class="nav-item" data-page="bots"><span class="nav-icon">◈</span> My Bots</button>
+    <button class="nav-item" data-page="deploy"><span class="nav-icon">⇧</span> Deploy a Bot</button>
+
+    <div class="admin-only">
+      <div class="nav-label">ADMIN</div>
+      <button class="nav-item" data-page="admin"><span class="nav-icon">◉</span> Admin Overview</button>
+      <button class="nav-item" data-page="admin-users"><span class="nav-icon">☷</span> Users</button>
+      <button class="nav-item" data-page="admin-bots"><span class="nav-icon">▤</span> All Bots</button>
+    </div>
+
+    <div class="nav-label">ACCOUNT</div>
+    <button class="nav-item" data-page="settings"><span class="nav-icon">⚙</span> Settings</button>
+
+    <div class="sidebar-bottom">
+      <div class="plan-card">
+        <h4>✦ Free Hosting Plan</h4>
+        <p id="planText">Up to 2 bots per account.</p>
+      </div>
+      <div style="padding:22px 8px 0;color:#59667e;font-size:10px;line-height:1.8">
+        POWERED BY<br><strong style="color:#9ba8c0">LËGĒNDÃRY LAB™ Studio</strong>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div style="display:flex;align-items:center;gap:14px">
+        <button class="mobile-menu" id="menuButton" aria-label="Open menu">☰</button>
+        <div>
+          <h2 id="pageTitle">Overview</h2>
+          <div class="breadcrumb">Workspace / <span id="breadcrumb">Dashboard</span></div>
+        </div>
+      </div>
+      <div class="avatar" id="avatar">?</div>
+    </header>
+
+    <div class="content">
+
+      <!-- OVERVIEW -->
+      <section class="page-view active" id="page-overview">
+        <div class="welcome">
+          <div>
+            <h1 id="welcomeTitle">Welcome</h1>
+            <p>Deploy Node.js bots from a ZIP file and manage them here.</p>
+          </div>
+          <button class="btn-sm btn" data-go="deploy" style="margin-top:0;width:auto">＋ Deploy a Bot</button>
+        </div>
+
+        <div class="stats">
+          <div class="stat-card">
+            <div class="stat-title">Your bots</div>
+            <div class="stat-value" id="ovBots">—</div>
+            <div class="stat-foot" id="ovBotsFoot"></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-title">Running now</div>
+            <div class="stat-value" id="ovRunning">—</div>
+            <div class="stat-foot">Bots currently online</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-title">Account</div>
+            <div class="stat-value" id="ovUsername">—</div>
+            <div class="stat-foot" id="ovRole"></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-title">Platform</div>
+            <div class="stat-value" id="ovPlatform">Checking…</div>
+            <div class="stat-foot" id="ovPlatformFoot"></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="section-head">
+            <div>
+              <h3>Recent bots</h3>
+              <p>Your latest deployments</p>
+            </div>
+            <button class="btn-ghost" data-go="bots">View all</button>
+          </div>
+          <div id="ovRecent"></div>
+        </div>
+      </section>
+
+      <!-- MY BOTS -->
+      <section class="page-view" id="page-bots">
+        <div class="welcome">
+          <div>
+            <h1>My Bots</h1>
+            <p>Start, stop, restart and inspect your bots.</p>
+          </div>
+          <button class="btn-sm btn" data-go="deploy" style="margin-top:0;width:auto">＋ Deploy a Bot</button>
+        </div>
+        <div id="botList"></div>
+      </section>
+
+      <!-- DEPLOY -->
+      <section class="page-view" id="page-deploy">
+        <div class="welcome">
+          <div>
+            <h1>Deploy a Bot</h1>
+            <p>Upload a ZIP of your Node.js bot. It must include a package.json with a "main" or "start" script, or an index.js file.</p>
+          </div>
+        </div>
+        <div class="panel" style="max-width:720px">
+          <form id="deployForm" novalidate>
+            <label for="botName">Bot name</label>
+            <input id="botName" maxlength="40" placeholder="e.g. My WhatsApp Bot" required>
+            <label for="botZip">ZIP file (up to 25 MB)</label>
+            <input id="botZip" type="file" accept=".zip,application/zip" required style="padding:10px">
+            <div class="note">
+              Bots run with no access to the panel's files or secrets, and are stopped if they use more than 192 MB of memory.
+              Keep secrets such as bot tokens in the Settings for your bot after uploading, not inside the ZIP.
+            </div>
+            <button class="btn" type="submit" id="deployBtn">Upload and install</button>
+          </form>
+          <div class="msg" id="deployMsg" role="alert"></div>
+        </div>
+      </section>
+
+      <!-- BOT DETAIL -->
+      <section class="page-view" id="page-bot">
+        <div class="welcome">
+          <div>
+            <h1 id="botTitle">Bot</h1>
+            <p id="botSub"></p>
+          </div>
+          <button class="btn-ghost" data-go="bots">← Back to My Bots</button>
+        </div>
+        <div class="panel">
+          <div class="bot-actions" id="botControls" style="margin-top:0"></div>
+          <div class="info-row" style="margin-top:14px"><span>Status</span><span id="botStatus">—</span></div>
+          <div class="info-row"><span>Memory</span><span id="botMem">—</span></div>
+          <div class="info-row"><span>Uptime</span><span id="botUptime">—</span></div>
+          <div class="info-row"><span>Last exit</span><span id="botExit">—</span></div>
+        </div>
+        <div class="panel">
+          <div class="section-head">
+            <div>
+              <h3>Logs</h3>
+              <p>Latest output from your bot (secret values are hidden)</p>
+            </div>
+            <button class="btn-ghost" id="refreshLogs">Refresh</button>
+          </div>
+          <textarea id="botLogs" readonly style="min-height:300px"></textarea>
+        </div>
+        <div class="panel">
+          <div class="section-head">
+            <div>
+              <h3>Environment variables</h3>
+              <p>Set secrets such as bot tokens. Values are stored encrypted and never shown again. Restart the bot after changing them.</p>
+            </div>
+          </div>
+          <p class="stat-foot" id="envNames" style="margin-bottom:12px"></p>
+          <form id="envForm" novalidate>
+            <label for="envText">One per line as NAME=value (replaces all current variables)</label>
+            <textarea id="envText" style="min-height:140px" placeholder="BOT_TOKEN=123:abc&#10;API_KEY=xyz"></textarea>
+            <button class="btn" type="submit">Save variables</button>
+          </form>
+          <div class="msg" id="envMsg" role="alert"></div>
+        </div>
+      </section>
+
+      <!-- SETTINGS -->
+      <section class="page-view" id="page-settings">
+        <div class="welcome"><div><h1>Settings</h1><p>Your account details.</p></div></div>
+        <div class="panel" style="max-width:720px">
+          <div class="info-row"><span>Username</span><span id="setUsername">—</span></div>
+          <div class="info-row"><span>Email</span><span id="setEmail">—</span></div>
+          <div class="info-row"><span>Role</span><span id="setRole">—</span></div>
+          <div class="info-row" style="padding-top:20px"><span></span><button class="btn-ghost" id="logoutBtn">Log out</button></div>
+        </div>
+        <div class="panel" id="claimPanel" style="max-width:720px">
+          <div class="section-head"><div><h3>Admin access</h3><p>Only for the panel owner. Enter the setup code given to you by the server administrator.</p></div></div>
+          <form id="claimForm" novalidate>
+            <label for="claimCode">Setup code</label>
+            <input id="claimCode" type="password" autocomplete="off">
+            <button class="btn" type="submit">Enable admin access</button>
+          </form>
+          <div class="msg" id="claimMsg" role="alert"></div>
+        </div>
+      </section>
+
+      <!-- ADMIN -->
+      <section class="page-view" id="page-admin">
+        <div class="welcome"><div><h1>Admin Overview</h1><p>Panel-wide totals and limits.</p></div></div>
+        <div class="stats">
+          <div class="stat-card"><div class="stat-title">Users</div><div class="stat-value" id="adUsers">—</div></div>
+          <div class="stat-card"><div class="stat-title">Bots</div><div class="stat-value" id="adBots">—</div></div>
+          <div class="stat-card"><div class="stat-title">Running</div><div class="stat-value" id="adRunning">—</div></div>
+          <div class="stat-card"><div class="stat-title">Sandbox</div><div class="stat-value" id="adSandbox">—</div></div>
+        </div>
+        <div class="panel">
+          <div class="info-row"><span>Max bots per user</span><span id="adMaxBots">—</span></div>
+          <div class="info-row"><span>Memory per bot</span><span id="adMem">—</span></div>
+          <div class="info-row"><span>Bots running at once</span><span id="adMaxRun">—</span></div>
+          <div class="info-row"><span>Disk per bot (after install)</span><span id="adDisk">—</span></div>
+        </div>
+      </section>
+
+      <section class="page-view" id="page-admin-users">
+        <div class="welcome"><div><h1>Users</h1><p>Disable an account to log it out and stop its bots.</p></div></div>
+        <div class="panel"><div class="table-wrap"><table>
+          <thead><tr><th>ID</th><th>Username</th><th>Email</th><th>Role</th><th>Bots</th><th>Status</th><th></th></tr></thead>
+          <tbody id="usersBody"></tbody>
+        </table></div></div>
+      </section>
+
+      <section class="page-view" id="page-admin-bots">
+        <div class="welcome"><div><h1>All Bots</h1><p>Every deployment on the panel.</p></div></div>
+        <div class="panel"><div class="table-wrap"><table>
+          <thead><tr><th>ID</th><th>Name</th><th>Owner</th><th>Status</th><th>Last exit</th><th></th></tr></thead>
+          <tbody id="allBotsBody"></tbody>
+        </table></div></div>
+      </section>
+
+      <footer class="footer">
+        <span>© <span id="year"></span> LËGĒNDÃRY LAB™ Studio</span>
+        <span>LEGENDARY FREE PANEL</span>
+      </footer>
+    </div>
   </main>
+</div>
 
-  <script>
-    const $ = (id) => document.getElementById(id);
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    function setMsg(el, text, type) {
-      el.textContent = text || '';
-      el.className = 'msg' + (type ? ' ' + type : '');
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const sidebar = $('sidebar');
+  const toastEl = $('toast');
+  let toastTimer;
+  let currentUser = null;
+  let currentBotId = null;
+  let pollTimer = null;
+  $('year').textContent = new Date().getFullYear();
+
+  // ---------- helpers (all user data is written with textContent, never innerHTML) ----------
+  function notify(text) {
+    toastEl.textContent = text;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 3500);
+  }
+  function setMsg(el, text, type) {
+    el.textContent = text || '';
+    el.className = 'msg' + (type ? ' ' + type : '');
+  }
+  function el(tag, props, children) {
+    const node = document.createElement(tag);
+    if (props) {
+      for (const [k, v] of Object.entries(props)) {
+        if (v === null || v === undefined || v === false) continue;
+        if (k === 'class') node.className = v;
+        else if (k === 'text') node.textContent = v;
+        else if (k === 'onclick') node.addEventListener('click', v);
+        else node.setAttribute(k, v);
+      }
     }
+    (children || []).forEach(c => node.appendChild(typeof c === 'string' ? document.createTextNode(c) : c));
+    return node;
+  }
+  function fmtMb(v) { return v == null ? '—' : v + ' MB'; }
+  function fmtUptime(s) {
+    if (s == null) return '—';
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+    return (h ? h + 'h ' : '') + (m ? m + 'm ' : '') + sec + 's';
+  }
+  function statusLabel(s) {
+    return { installing: 'Installing', running: 'Running', stopped: 'Stopped',
+      crashed: 'Crashed', install_failed: 'Install failed' }[s] || s;
+  }
+  function badge(status) {
+    const cls = status === 'running' ? 'badge' : 'badge ' + status;
+    return el('span', { class: cls, text: statusLabel(status) });
+  }
 
-    async function api(path, body) {
-      const res = await fetch(path, {
-        method: body ? 'POST' : 'GET',
-        credentials: 'same-origin',
-        headers: body ? { 'Content-Type': 'application/json' } : {},
-        body: body ? JSON.stringify(body) : undefined
-      });
-      let data = {};
-      try { data = await res.json(); } catch (_) {}
-      return { ok: res.ok, status: res.status, data };
+  async function api(path, opts) {
+    opts = opts || {};
+    const init = { method: opts.method || (opts.body !== undefined || opts.raw ? 'POST' : 'GET'), credentials: 'same-origin', headers: {} };
+    if (opts.raw) {
+      init.headers['Content-Type'] = 'application/zip';
+      init.body = opts.raw;
+    } else if (opts.body !== undefined) {
+      init.headers['Content-Type'] = 'application/json';
+      init.body = JSON.stringify(opts.body);
     }
+    const res = await fetch(path, init);
+    let data = {};
+    try { data = await res.json(); } catch (_) {}
+    return { ok: res.ok, status: res.status, data };
+  }
 
-    function showAuth() {
-      $('auth-view').classList.remove('hidden');
-      $('dashboard').classList.add('hidden');
-      $('subtitle').textContent = 'Sign in to manage your hosting.';
-    }
+  // ---------- navigation ----------
+  const pageNames = {
+    overview: ['Overview', 'Dashboard'],
+    bots: ['My Bots', 'Bots'],
+    deploy: ['Deploy a Bot', 'New Bot'],
+    bot: ['Bot', 'Bot details'],
+    settings: ['Settings', 'Account'],
+    admin: ['Admin Overview', 'Admin'],
+    'admin-users': ['Users', 'Admin'],
+    'admin-bots': ['All Bots', 'Admin']
+  };
 
-    function showDashboard(user) {
-      $('me-username').textContent = user.username;
-      $('me-email').textContent = user.email;
-      $('me-role').textContent = user.role;
-      $('auth-view').classList.add('hidden');
-      $('dashboard').classList.remove('hidden');
-      $('subtitle').textContent = 'Welcome back, ' + user.username + '.';
-    }
+  function showPage(page) {
+    if (!pageNames[page]) return;
+    if (page.startsWith('admin') && !(currentUser && currentUser.role === 'admin')) return;
+    document.querySelectorAll('.page-view').forEach(s => s.classList.remove('active'));
+    const target = $('page-' + page);
+    if (target) target.classList.add('active');
+    document.querySelectorAll('.nav-item[data-page]').forEach(b => {
+      b.classList.toggle('active', b.dataset.page === page);
+    });
+    $('pageTitle').textContent = pageNames[page][0];
+    $('breadcrumb').textContent = pageNames[page][1];
+    sidebar.classList.remove('open');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 
-    function setTab(which) {
-      const login = which === 'login';
-      $('tab-login').classList.toggle('active', login);
-      $('tab-register').classList.toggle('active', !login);
-      $('login-form').classList.toggle('hidden', !login);
-      $('register-form').classList.toggle('hidden', login);
+    if (page === 'overview') loadOverview();
+    if (page === 'bots') loadBots();
+    if (page === 'admin') loadAdminOverview();
+    if (page === 'admin-users') loadUsers();
+    if (page === 'admin-bots') loadAllBots();
+    if (page === 'settings') loadSettings();
+    if (page !== 'bot') stopBotPolling();
+  }
+
+  document.querySelectorAll('[data-page]').forEach(b => b.addEventListener('click', () => showPage(b.dataset.page)));
+  document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => showPage(b.dataset.go)));
+  $('menuButton').addEventListener('click', () => sidebar.classList.toggle('open'));
+
+  // ---------- auth screens ----------
+  function setTab(which) {
+    const login = which === 'login';
+    $('tab-login').classList.toggle('active', login);
+    $('tab-register').classList.toggle('active', !login);
+    $('login-form').classList.toggle('hidden', !login);
+    $('register-form').classList.toggle('hidden', login);
+    setMsg($('auth-msg'), '');
+  }
+  $('tab-login').addEventListener('click', () => setTab('login'));
+  $('tab-register').addEventListener('click', () => setTab('register'));
+
+  function showAuth() {
+    stopBotPolling();
+    currentUser = null;
+    document.body.classList.remove('is-admin');
+    $('app-view').classList.add('hidden');
+    $('auth-view').classList.remove('hidden');
+  }
+
+  function showApp(user) {
+    currentUser = user;
+    document.body.classList.toggle('is-admin', user.role === 'admin');
+    $('auth-view').classList.add('hidden');
+    $('app-view').classList.remove('hidden');
+    const name = user.username || '';
+    $('avatar').textContent = name.charAt(0) || '?';
+    $('welcomeTitle').textContent = 'Welcome, ' + name;
+    showPage('overview');
+  }
+
+  $('login-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const btn = e.target.querySelector('button');
+    btn.disabled = true;
+    setMsg($('auth-msg'), 'Logging in…');
+    const r = await api('/api/auth/login', { body: {
+      identifier: $('identifier').value,
+      password: $('login-password').value
+    } });
+    btn.disabled = false;
+    if (r.ok) {
+      $('login-password').value = '';
       setMsg($('auth-msg'), '');
+      showApp(r.data.user);
+    } else {
+      setMsg($('auth-msg'), r.data.error || 'Login failed. Try again.', 'error');
+    }
+  });
+
+  $('register-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const btn = e.target.querySelector('button');
+    btn.disabled = true;
+    setMsg($('auth-msg'), 'Creating account…');
+    const r = await api('/api/auth/register', { body: {
+      username: $('username').value,
+      email: $('email').value,
+      password: $('register-password').value
+    } });
+    btn.disabled = false;
+    if (r.ok) {
+      $('register-password').value = '';
+      setMsg($('auth-msg'), '');
+      showApp(r.data.user);
+    } else {
+      setMsg($('auth-msg'), r.data.error || 'Could not create account.', 'error');
+    }
+  });
+
+  async function logout() {
+    const r = await api('/api/auth/logout', { method: 'POST' });
+    if (r.ok || r.status === 401) {
+      setTab('login');
+      showAuth();
+    } else {
+      notify(r.data.error || 'Could not log out. Try again.');
+    }
+  }
+  $('logoutBtn').addEventListener('click', logout);
+
+  // ---------- overview ----------
+  async function loadOverview() {
+    $('ovUsername').textContent = currentUser.username;
+    $('ovRole').textContent = currentUser.role === 'admin' ? 'Administrator' : 'Member';
+
+    const [bots, health] = await Promise.all([api('/api/bots'), api('/api/health')]);
+
+    if (bots.ok) {
+      const list = bots.data.bots;
+      const running = list.filter(b => b.running).length;
+      $('ovBots').textContent = list.length + ' / ' + bots.data.limit;
+      $('ovBotsFoot').textContent = list.length ? 'Bots on your account' : 'No bots yet';
+      $('ovRunning').textContent = running;
+      const recent = $('ovRecent');
+      recent.replaceChildren();
+      if (!list.length) {
+        recent.appendChild(el('div', { class: 'empty' }, [
+          el('b', { text: 'No bots yet' }),
+          'Deploy your first bot from a ZIP file.'
+        ]));
+      } else {
+        list.slice(0, 3).forEach(b => recent.appendChild(botCard(b)));
+      }
     }
 
-    $('tab-login').addEventListener('click', () => setTab('login'));
-    $('tab-register').addEventListener('click', () => setTab('register'));
+    if (health.ok) {
+      const dot = el('span', { class: 'dot' });
+      $('ovPlatform').replaceChildren(dot, document.createTextNode('Online'));
+      $('ovPlatformFoot').textContent = health.data.sandbox
+        ? 'Bots run in a sandbox'
+        : 'Bot uploads are paused on this server';
+      if (health.data.limits) {
+        $('planText').textContent = 'Up to ' + health.data.limits.maxBotsPerUser +
+          ' bots per account, ' + health.data.limits.memoryMb + ' MB memory each.';
+      }
+    } else {
+      $('ovPlatform').replaceChildren(el('span', { class: 'dot off' }), document.createTextNode('Unavailable'));
+      $('ovPlatformFoot').textContent = 'Could not reach the panel server';
+    }
+  }
 
-    $('login-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const btn = e.submitter || e.target.querySelector('button');
-      btn.disabled = true;
-      setMsg($('auth-msg'), 'Logging in...');
-      const r = await api('/api/auth/login', {
-        identifier: $('identifier').value,
-        password: $('login-password').value
+  // ---------- bots ----------
+  function botCard(b) {
+    const card = el('div', { class: 'bot-card' });
+    card.appendChild(el('div', { class: 'bot-top' }, [
+      el('div', { class: 'bot-name', text: b.name }),
+      badge(b.status)
+    ]));
+    const meta = [];
+    meta.push('Entry: ' + (b.entry || '—'));
+    if (b.running) meta.push('Memory: ' + fmtMb(b.memoryMb) + ' · Uptime: ' + fmtUptime(b.uptimeSec));
+    if (b.lastExit && !b.running) meta.push('Last exit: ' + b.lastExit);
+    card.appendChild(el('div', { class: 'bot-meta', text: meta.join('\n') }));
+    card.appendChild(el('div', { class: 'bot-actions' }, [
+      el('button', { class: 'btn-ghost', text: 'Open', onclick: () => openBot(b.id) })
+    ]));
+    return card;
+  }
+
+  async function loadBots() {
+    const r = await api('/api/bots');
+    const root = $('botList');
+    if (!r.ok) {
+      root.replaceChildren(el('div', { class: 'empty', text: r.data.error || 'Could not load bots.' }));
+      return;
+    }
+    const list = r.data.bots;
+    if (!list.length) {
+      root.replaceChildren(el('div', { class: 'panel empty' }, [
+        el('b', { text: 'No bots yet' }),
+        'Deploy a Node.js bot from a ZIP file to get started.',
+        el('div', { style: 'margin-top:16px' }, [
+          el('button', { class: 'btn-sm btn', text: 'Deploy a Bot', onclick: () => showPage('deploy') })
+        ])
+      ]));
+      return;
+    }
+    const grid = el('div', { class: 'bot-grid' });
+    list.forEach(b => grid.appendChild(botCard(b)));
+    root.replaceChildren(grid);
+  }
+
+  // ---------- deploy ----------
+  $('deployForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const name = $('botName').value.trim();
+    const file = $('botZip').files[0];
+    if (!name) return setMsg($('deployMsg'), 'Enter a name for your bot.', 'error');
+    if (!file) return setMsg($('deployMsg'), 'Choose a ZIP file.', 'error');
+    if (file.size > 25 * 1024 * 1024) return setMsg($('deployMsg'), 'That file is larger than 25 MB.', 'error');
+
+    const btn = $('deployBtn');
+    btn.disabled = true;
+    setMsg($('deployMsg'), 'Uploading…');
+    const buf = await file.arrayBuffer();
+    const r = await api('/api/bots?name=' + encodeURIComponent(name), { raw: buf });
+    btn.disabled = false;
+
+    if (r.ok) {
+      setMsg($('deployMsg'), r.data.message || 'Uploaded.', 'ok');
+      $('deployForm').reset();
+      openBot(r.data.bot.id);
+    } else {
+      setMsg($('deployMsg'), r.data.error || 'Upload failed.', 'error');
+    }
+  });
+
+  // ---------- bot detail ----------
+  function openBot(id) {
+    currentBotId = id;
+    showPage('bot');
+    refreshBot();
+    startBotPolling();
+  }
+
+  function startBotPolling() {
+    stopBotPolling();
+    pollTimer = setInterval(() => { if (currentBotId) refreshBot(); }, 4000);
+  }
+  function stopBotPolling() {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = null;
+  }
+
+  async function refreshBot() {
+    if (!currentBotId) return;
+    const r = await api('/api/bots/' + currentBotId);
+    if (!r.ok) {
+      if (r.status === 404) {
+        notify('That bot no longer exists.');
+        showPage('bots');
+      }
+      return;
+    }
+    renderBot(r.data.bot);
+    if (currentBotId === r.data.bot.id) {
+      const logs = await api('/api/bots/' + currentBotId + '/logs');
+      if (logs.ok) {
+        const box = $('botLogs');
+        const atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 20;
+        box.value = logs.data.logs || 'No output yet.';
+        if (atBottom) box.scrollTop = box.scrollHeight;
+      }
+    }
+  }
+
+  function renderBot(b) {
+    $('botTitle').textContent = b.name;
+    $('botSub').textContent = b.entry ? 'Entry file: ' + b.entry : '';
+    $('botStatus').replaceChildren(badge(b.status));
+    $('botMem').textContent = b.running ? fmtMb(b.memoryMb) : '—';
+    $('botUptime').textContent = b.running ? fmtUptime(b.uptimeSec) : '—';
+    $('botExit').textContent = b.lastExit || '—';
+    $('envNames').textContent = b.envNames.length
+      ? 'Set: ' + b.envNames.join(', ')
+      : 'No variables set.';
+
+    const ready = b.status !== 'installing' && b.status !== 'install_failed';
+    const controls = $('botControls');
+    controls.replaceChildren(
+      el('button', { class: 'btn-sm btn', text: 'Start', disabled: (!ready || b.running) ? 'disabled' : null,
+        onclick: () => botAction('start') }),
+      el('button', { class: 'btn-ghost', text: 'Stop', disabled: b.running ? null : 'disabled',
+        onclick: () => botAction('stop') }),
+      el('button', { class: 'btn-ghost', text: 'Restart', disabled: (!ready || !b.running) ? null : 'disabled',
+        onclick: () => botAction('restart') }),
+      el('button', { class: 'btn-danger', text: 'Delete bot', onclick: deleteBot })
+    );
+  }
+
+  async function botAction(action) {
+    const r = await api('/api/bots/' + currentBotId + '/' + action, { method: 'POST' });
+    notify(r.ok ? (r.data.message || 'Done.') : (r.data.error || 'Action failed.'));
+    refreshBot();
+  }
+
+  async function deleteBot() {
+    if (!confirm('Delete this bot and all its files? This cannot be undone.')) return;
+    const r = await api('/api/bots/' + currentBotId, { method: 'DELETE' });
+    if (r.ok) {
+      notify('Bot deleted.');
+      currentBotId = null;
+      showPage('bots');
+    } else {
+      notify(r.data.error || 'Could not delete the bot.');
+    }
+  }
+
+  $('refreshLogs').addEventListener('click', refreshBot);
+
+  $('envForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const vars = {};
+    const lines = $('envText').value.split('\n');
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (!line || line.startsWith('#')) continue;
+      const i = line.indexOf('=');
+      if (i < 1) return setMsg($('envMsg'), 'Each line must look like NAME=value: ' + line.slice(0, 40), 'error');
+      vars[line.slice(0, i).trim()] = line.slice(i + 1);
+    }
+    const r = await api('/api/bots/' + currentBotId + '/env', { method: 'PUT', body: { vars } });
+    if (r.ok) {
+      setMsg($('envMsg'), r.data.message, 'ok');
+      $('envText').value = '';
+      refreshBot();
+    } else {
+      setMsg($('envMsg'), r.data.error || 'Could not save.', 'error');
+    }
+  });
+
+  // ---------- settings ----------
+  function loadSettings() {
+    $('setUsername').textContent = currentUser.username;
+    $('setEmail').textContent = currentUser.email;
+    $('setRole').textContent = currentUser.role === 'admin' ? 'Administrator' : 'Member';
+    $('claimPanel').classList.toggle('hidden', currentUser.role === 'admin');
+  }
+
+  $('claimForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const r = await api('/api/admin/claim', { body: { code: $('claimCode').value } });
+    if (r.ok) {
+      currentUser = r.data.user;
+      document.body.classList.add('is-admin');
+      $('claimCode').value = '';
+      setMsg($('claimMsg'), 'Admin access enabled.', 'ok');
+      loadSettings();
+    } else {
+      setMsg($('claimMsg'), r.data.error || 'Not allowed.', 'error');
+    }
+  });
+
+  // ---------- admin ----------
+  async function loadAdminOverview() {
+    const r = await api('/api/admin/overview');
+    if (!r.ok) return notify(r.data.error || 'Could not load.');
+    $('adUsers').textContent = r.data.users;
+    $('adBots').textContent = r.data.bots;
+    $('adRunning').textContent = r.data.running;
+    $('adSandbox').textContent = r.data.sandbox ? 'On' : 'Off';
+    $('adMaxBots').textContent = r.data.limits.maxBotsPerUser;
+    $('adMem').textContent = r.data.limits.memoryMb + ' MB';
+    $('adMaxRun').textContent = r.data.limits.maxRunning;
+    $('adDisk').textContent = r.data.limits.maxDiskMb + ' MB';
+  }
+
+  async function loadUsers() {
+    const r = await api('/api/admin/users');
+    const body = $('usersBody');
+    if (!r.ok) return body.replaceChildren();
+    body.replaceChildren(...r.data.users.map(u => {
+      const isMe = currentUser && u.id === currentUser.id;
+      const action = isMe ? el('span', { text: '—' }) : el('button', {
+        class: u.disabled ? 'btn-ghost btn-sm' : 'btn-danger btn-sm',
+        text: u.disabled ? 'Enable' : 'Disable',
+        onclick: async () => {
+          const path = '/api/admin/users/' + u.id + (u.disabled ? '/enable' : '/disable');
+          const res = await api(path, { method: 'POST' });
+          notify(res.ok ? res.data.message : (res.data.error || 'Failed.'));
+          loadUsers();
+        }
       });
-      btn.disabled = false;
-      if (r.ok) {
-        $('login-password').value = '';
-        setMsg($('auth-msg'), '');
-        showDashboard(r.data.user);
-      } else {
-        setMsg($('auth-msg'), r.data.error || 'Login failed. Try again.', 'error');
-      }
-    });
+      return el('tr', {}, [
+        el('td', { text: String(u.id) }),
+        el('td', { text: u.username }),
+        el('td', { text: u.email }),
+        el('td', { text: u.role }),
+        el('td', { text: String(u.bot_count) }),
+        el('td', { text: u.disabled ? 'Disabled' : 'Active' }),
+        el('td', { class: 'actions' }, [action])
+      ]);
+    }));
+  }
 
-    $('register-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const btn = e.submitter || e.target.querySelector('button');
-      btn.disabled = true;
-      setMsg($('auth-msg'), 'Creating account...');
-      const r = await api('/api/auth/register', {
-        username: $('username').value,
-        email: $('email').value,
-        password: $('register-password').value
-      });
-      btn.disabled = false;
-      if (r.ok) {
-        $('register-password').value = '';
-        setMsg($('auth-msg'), '');
-        showDashboard(r.data.user);
-      } else {
-        setMsg($('auth-msg'), r.data.error || 'Could not create account.', 'error');
-      }
-    });
+  async function loadAllBots() {
+    const r = await api('/api/admin/bots');
+    const body = $('allBotsBody');
+    if (!r.ok) return body.replaceChildren();
+    body.replaceChildren(...r.data.bots.map(b => el('tr', {}, [
+      el('td', { text: String(b.id) }),
+      el('td', { text: b.name }),
+      el('td', { text: b.owner }),
+      el('td', {}, [badge(b.status)]),
+      el('td', { text: b.lastExit || '—' }),
+      el('td', { class: 'actions' }, [
+        b.running ? el('button', {
+          class: 'btn-danger btn-sm', text: 'Stop',
+          onclick: async () => {
+            const res = await api('/api/admin/bots/' + b.id + '/stop', { method: 'POST' });
+            notify(res.ok ? res.data.message : (res.data.error || 'Failed.'));
+            loadAllBots();
+          }
+        }) : el('span', { text: '—' })
+      ])
+    ])));
+  }
 
-    $('logout-btn').addEventListener('click', async () => {
-      const r = await api('/api/auth/logout', {});
-      if (r.ok || r.status === 401) {
-        showAuth();
-      } else {
-        setMsg($('dash-msg'), r.data.error || 'Could not log out.', 'error');
-      }
-    });
-
-    // On page load, reuse an existing session if there is one.
-    (async () => {
-      const r = await api('/api/me');
-      if (r.ok && r.data.user) showDashboard(r.data.user);
-    })();
-  </script>
+  // ---------- startup: reuse an existing session ----------
+  (async () => {
+    const r = await api('/api/me');
+    if (r.ok && r.data.user) {
+      showApp(r.data.user);
+    } else {
+      showAuth();
+    }
+  })();
+})();
+</script>
 </body>
 </html>
